@@ -22,29 +22,6 @@ def filter_words(wordclass, germanet, return_synsets=False):
         all_words = list(set(all_words))
     return all_words
 
-
-def word_choice_set(result, outpath):
-    for lex_unit in result:
-        ant = None
-        hyp = None
-        syn = None
-        synset = lex_unit.synset
-        hypernyms = [x.lexunits for x in synset.direct_hypernyms]
-        hypernyms = [item for sublist in hypernyms for item in sublist]
-        try:
-            hyp = random.choice(hypernyms).orthform
-            for rel, values in lex_unit.relations.items():
-                if str(rel)=='LexRel.has_synonym':
-                    syn = random.choice(list(values)).orthform
-                if str(rel)=='LexRel.has_antonym':
-                    ant = random.choice(list(values)).orthform
-        except IndexError:
-            continue
-        if ant and hyp and syn:
-            rand = random.choice(result).orthform
-            with open(outpath, 'a') as outfile:
-                outfile.write('{}\t{}\t{}\t{}\t{}\n'.format(lex_unit.orthform, syn, hyp, ant, rand))
-
                         
 def rel_class_set(result, wordclass, outpath):
     for lex_unit in result:
@@ -63,31 +40,14 @@ def rel_class_set(result, wordclass, outpath):
                 with open(outpath, 'a') as outfile:
                     outfile.write('{}\t{}\t{}\n'.format(lex_unit.orthform, str(rel), v.orthform))
 
-                    
-def remove_gender_pairs_WC(path):
-    fokuswords = []
-    with open(path, 'r') as f:
-        lines = f.readlines()
-        os.remove(path)
-        for line in lines:
-            words = re.split('\t|\n', line)[:5]
-            if words[0] == words[1]+'in' or words[1] == words[0]+'in' or words[1] in fokuswords or words[0] in fokuswords:
-                pass
-            else:
-                fokuswords.append(words[0])
-                with open(path, 'a') as outfile:
-                    outfile.write('{}\t{}\t{}\t{}\t{}\n'.format(words[0], words[1], words[2], words[3], words[4]))
-     
-    
+
 def main():
     data_path = "../GermaNet/GN_V140/GN_V140_XML"
     germanet = Germanet(data_path)
     
     for wordclass in ['N', 'V', 'ADJ']:
         words = filter_words(wordclass, germanet, return_synsets=False)
-        word_choice_set(words, 'germanet_WC.csv')
         rel_class_set(words, wordclass, 'germanet_RC.csv')
-    remove_gender_pairs_WC('germanet_WC.csv')
         
         
 if __name__ == "__main__":
