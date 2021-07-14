@@ -1,3 +1,5 @@
+import re
+
 import argparse
 
 import collections
@@ -78,10 +80,77 @@ def generate_germanet_testset(gn_data_file, restrict_vocab=None):
     return list(sorted(gn_output, key=lambda x: x[0]))
 
 
+def generate_toefl_testset(toefl_data_file, restrict_vocab=None):
+    output = []
+    for line in toefl_data_file:
+        if line.startswith(':'):
+            continue
+        prompt = tuple(line.strip().split(' '))
+        if restrict_vocab and any(x not in restrict_vocab for x in prompt):
+            continue
+        else:
+            output.append(prompt)
+
+    return output
+
+
+def generate_schm_testset(schm_data_file, restrict_vocab=None):
+    output = []
+
+    replacements = {'vorhergehend': 'vorhergehend', 'heilig': 'heilig', 'ficken': 'ficken', 'trinken': 'trinken',
+        'japanisch': 'japanisch', 'schlau': 'schlau', 'flüssig': 'flüssig', 'amerikanisch': 'amerikanisch',
+        'dumm': 'dumm', 'fbi': 'FBI', 'spring': 'Sprung', 'opec': 'OPEC'}
+
+    pat = regex.compile(r'(\p{L}+)-(\p{L}+)\t([\p{N}.]+)')
+    for line in schm_data_file:
+        if line.startswith(':'):
+            continue
+        m = pat.fullmatch(line.strip())
+        a = m.group(1)
+        b = m.group(2)
+        value = m.group(3)
+
+        if a in replacements:
+            a = replacements[a]
+        else:
+            a = a.capitalize()
+        if b in replacements:
+            b = replacements[b]
+        else:
+            b = b.capitalize()
+
+        if restrict_vocab is not None and (a not in restrict_vocab or b not in restrict_vocab):
+            continue
+        else:
+            output.append((str(float(value)), a, b))
+
+    return output
+
+
+def generate_simlex_testset(schm_data_file, restrict_vocab=None):
+    output = []
+
+    pat = regex.compile(r'(\p{L}+),(\p{L}+),(?:.*),([\p{N}.]+)$')
+    for line in itertools.islice(schm_data_file, 1, None):
+        m = pat.fullmatch(line.strip())
+        a = m.group(1)
+        b = m.group(2)
+        value = m.group(3)
+
+        if restrict_vocab is not None and (a not in restrict_vocab or b not in restrict_vocab):
+            continue
+        else:
+            output.append((str(float(value)), a, b))
+
+    return output
+
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--germanet', dest='gn_data_file', type=argparse.FileType('r'), default='germanet_relations.tsv')
+    parser.add_argument('--toefl', dest='toefl_data_file', type=argparse.FileType('r'), default='analogies/de_toefl_subset.txt')
+    parser.add_argument('--schm', dest='schm_data_file', type=argparse.FileType('r'), default='analogies/de_re-rated_Schm280.txt')
+    parser.add_argument('--simlex', dest='simlex_data_file', type=argparse.FileType('r'), default='SimLex_ALL_Langs_TXT_Format/MSimLex999_German.txt')
     parser.add_argument('--vocab',  type=argparse.FileType('r'))
     parser.add_argument('--output', type=argparse.FileType('w'), default='testsets.tsv')
 
@@ -91,11 +160,20 @@ def main():
         restrict_vocab = set(x.strip() for x in args.vocab)
         args.vocab.close()
 
-    for gn_line in generate_germanet_testset(args.gn_data_file, restrict_vocab=restrict_vocab):
-        print('germanet\t' + '\t'.join(gn_line), file=args.output)
+    print('dataset', 'value', '0', '1', '2', '3', '4', '5', sep='\t', file=args.output)
+    for line in generate_germanet_testset(args.gn_data_file, restrict_vocab=restrict_vocab):
+        print('germanet', *line, '', '', '', '', sep='\t', file=args.output)
 
+    for line in generate_toefl_testset(args.toefl_data_file, restrict_vocab=restrict_vocab):
+        print('toefl', *line, '', sep='\t', file=args.output)
 
-    # TODO wiktionary, TOEFL, Schm280, MEN, SimLex
+    for line in generate_schm_testset(args.schm_data_file, restrict_vocab=restrict_vocab):
+        print('schm280', *line, '', '', '', '', sep='\t', file=args.output)
+
+    for line in generate_simlex_testset(args.simlex_data_file, restrict_vocab=restrict_vocab):
+        print('simlex', *line, '', '', '', '', sep='\t', file=args.output)
+
+    # TODO wiktionary, MEN
     args.output.close()
 
 

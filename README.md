@@ -14,11 +14,14 @@ pip install -r requirements.txt
 cat $(find GN_V140/GN_V140_XML/* | sort) | sha256sum
 # > 09ca06d178edf193648807cb983181670fd443b458e8c148a012808780962925  -
 
-# 2. Download the Schm280 and TOEFL dataset from IMS Stuttgart
+# 2. Download the Schm280 and TOEFL dataset from IMS Stuttgart,
+#    and download the MSimlex999 dataset from the Project's website
 wget https://www.ims.uni-stuttgart.de/documents/ressourcen/lexika/analogies_ims/analogies.zip
 unzip analogies.zip
+wget https://leviants.com/wp-content/uploads/2020/01/SimLex_ALL_Langs_TXT_Format.zip
+unzip SimLex_ALL_Langs_TXT_Format.zip
 
-# 3. TODO MEN, Duden, Simlex
+# 3. TODO MEN, Duden
 
 # 4. Generate all Germanet Relations from the Corpus
 python germanet_extraction.py --germanet ./GN_V140/GN_V140_XML
