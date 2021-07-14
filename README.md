@@ -21,7 +21,7 @@ unzip analogies.zip
 wget https://leviants.com/wp-content/uploads/2020/01/SimLex_ALL_Langs_TXT_Format.zip
 unzip SimLex_ALL_Langs_TXT_Format.zip
 
-# 3. TODO MEN, Duden
+# 3. TODO Duden, Wiktionary
 
 # 4. Generate all Germanet Relations from the Corpus
 python germanet_extraction.py --germanet ./GN_V140/GN_V140_XML

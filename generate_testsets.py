@@ -145,12 +145,30 @@ def generate_simlex_testset(schm_data_file, restrict_vocab=None):
     return output
 
 
+def generate_men_testset(men_data_file, restrict_vocab=None):
+    output = []
+
+    for line in itertools.islice(men_data_file, 1, None):
+        x = line.split('\t')
+        a = x[2]
+        b = x[3]
+        value = x[4]
+
+        if restrict_vocab is not None and (a not in restrict_vocab or b not in restrict_vocab):
+            continue
+        else:
+            output.append((value, a, b))
+
+    return output
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--germanet', dest='gn_data_file', type=argparse.FileType('r'), default='germanet_relations.tsv')
     parser.add_argument('--toefl', dest='toefl_data_file', type=argparse.FileType('r'), default='analogies/de_toefl_subset.txt')
     parser.add_argument('--schm', dest='schm_data_file', type=argparse.FileType('r'), default='analogies/de_re-rated_Schm280.txt')
     parser.add_argument('--simlex', dest='simlex_data_file', type=argparse.FileType('r'), default='SimLex_ALL_Langs_TXT_Format/MSimLex999_German.txt')
+    parser.add_argument('--men', dest='men_data_file', type=argparse.FileType('r'), default='MEN_de/MEN_dataset_de_full.tsv')
     parser.add_argument('--vocab',  type=argparse.FileType('r'))
     parser.add_argument('--output', type=argparse.FileType('w'), default='testsets.tsv')
 
@@ -173,7 +191,10 @@ def main():
     for line in generate_simlex_testset(args.simlex_data_file, restrict_vocab=restrict_vocab):
         print('simlex', *line, '', '', '', '', sep='\t', file=args.output)
 
-    # TODO wiktionary, MEN
+    for line in generate_men_testset(args.men_data_file, restrict_vocab=restrict_vocab):
+        print('men', *line, '', '', '', '', sep='\t', file=args.output)
+
+    # TODO Duden, Wiktionary
     args.output.close()
 
 
