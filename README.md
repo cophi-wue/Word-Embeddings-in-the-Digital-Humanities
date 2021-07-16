@@ -47,4 +47,11 @@ Please refer to the paper [_Multilingual Reliability and “Semantic” Structur
 
 ## Duden
 
+You need to buy a digital copy of "Das Wörterbuch der Synonyme" (EAN: 9783411913169) and place it in the folder duden. To gegerate the dataset
+rename the epub to "work.epub", extract its content and run "extract_duden.py". 
+
+## Wiktionary
+
+
+
 ## SimLex-999
