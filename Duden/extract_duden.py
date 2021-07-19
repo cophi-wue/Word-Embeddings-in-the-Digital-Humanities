@@ -2,10 +2,11 @@ import json
 import os
 import re
 import pandas as pd
+import numpy as np
 from collections import Counter
 from lxml import etree
 from bs4 import BeautifulSoup
-
+from scipy.spatial.distance import cosine
 
 
 
@@ -45,9 +46,9 @@ for fname in files:
 
 out = pd.DataFrame(output)
 out.columns = ["word","syn"]
-out.to_csv("duden_synonyme.tsv", sep="\t")
-with open("duden_synonyme.json","w") as f:
-    json.dump(syn_dict,f)
+#out.to_csv("duden_synonyme.tsv", sep="\t")
+#with open("duden_synonyme.json","w") as f:
+#    json.dump(syn_dict,f)
 
 data = syn_dict
 
@@ -85,5 +86,70 @@ for c in cand:
     if len(right) > 1 and len(wrong) > 1:          
         dataset[c] = {"right":list(set(right)),"wrong":list(set(wrong))}
         
-with open("duden_dataset.json","w") as f:
-    json.dump(dataset,f)
+#with open("duden_dataset.json","w") as f:
+#    json.dump(dataset,f)
+    
+data = dataset
+schulte = pd.read_csv("affective_norms.txt", sep="\t", index_col=0)
+
+basis = []
+for k in data.keys():
+    
+    right = data[k]["right"]
+    wrong = data[k]["wrong"]
+    
+    right_ = [x for x in right if x not in wrong and " " not in x and x != k]
+    wrong_ = [x for x in wrong if x not in right and " " not in x and x != k]
+    
+    if len(wrong_) < 4 or len(right_) < 2:
+        continue
+    try:
+        k_vec = np.array(schulte.loc[k,:])
+    except:
+        continue
+
+    i = 0
+    c = 0
+    r_choice = ""
+    
+    for r in right_:
+        try:
+            cos = 1-cosine(k_vec,np.array(schulte.loc[r,:]))
+
+            if cos > c:
+                c = cos
+                r_choice = r
+        except:
+            continue
+            
+    selection = []
+
+    for w in wrong_:
+        try:
+            cos = 1-cosine(k_vec,np.array(schulte.loc[w,:]))
+            selection.append([w,cos])
+        except:
+          
+            continue
+    
+
+    if len(selection) < 4:
+        continue
+    
+        
+    sel_frame = pd.DataFrame(selection)
+    sel_frame.columns = ["word","cos"]
+    sel_frame = sel_frame.sort_values("cos",ascending=False)
+    false_words = list(sel_frame["word"])[:4]
+        
+    score = (1-cosine(k_vec,np.array(schulte.loc[r_choice,:])))-np.mean(sel_frame.iloc[:3,1])
+    
+        
+    basis.append([k]+[r_choice]+false_words+[score])
+    
+   # if k == "Verzeichnis":
+   #     break
+frame = pd.DataFrame(basis)
+frame.columns = ["base","target","cand1","cand2","cand3","cand4","schulte_cosine"]
+frame.to_csv("duden_dataset.tsv", sep="\t")
+
