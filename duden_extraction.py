@@ -1,155 +1,123 @@
-import json
-import os
-import re
-import pandas as pd
-import numpy as np
 from collections import Counter
-from lxml import etree
+
+import argparse
+import itertools
+import numpy as np
+import os
+import pandas as pd
+import re
+import sys
 from bs4 import BeautifulSoup
 from scipy.spatial.distance import cosine
 
 
+def read_syn_dict(source_dir):
+    main_word = "ztz"
+    syn_dict = dict()
+
+    syns = ""
+    files = os.listdir(f"{source_dir}/OEBPS/Text")
+    for fname in files:
+        soup = BeautifulSoup(open(f"{source_dir}/OEBPS/Text/{fname}").read(), 'html.parser')
+        paras = soup.findAll("p")
+
+        for para in paras:
+            if len(list(para.children)) > 0 and list(para.children)[0].name == "span" and \
+                    list(para.children)[0]["class"][0] == 'blue1':
+
+                if main_word != "ztz":
+                    syns = [re.sub("[^A-Za-zäöüÖÜÄß]", "", x) for x in syns.split(", ") if " " not in list(x)]
+
+                    if len(syns) == 0 or len(main_word) == 1 or "," in list(main_word) or list(main_word)[0] in ["1", "2", "3"]:
+                        pass
+                    else:
+                        if len(syns[0]) != 0:
+                            syn_dict[main_word] = syns
+
+                main_word = para.text
+                syns = ""
+            if 'class' in para.attrs.keys() and para["class"][0] == "noindent" and "b" not in [x.name for x in para.children] and "small" not in [x.name for x in para.children] and "sup" not in [x.name for x in para.children]:
+                syns += para.text
+
+    return syn_dict
 
 
-main_word = "ztz"
-syns = ""
-output = []
-syn_dict = dict()
-files = os.listdir("work/OEBPS/Text")
+def generate_dataset(syn_dict):
+    mylists = [[x] + syn_dict[x] for x in syn_dict.keys()]
+    cand = [k for k, v in Counter(itertools.chain(*mylists)).items() if v > 2]
 
-for fname in files:
-    
-    soup = BeautifulSoup(open("work/OEBPS/Text/"+fname).read(), 'html.parser')
-    paras = soup.findAll("p")
-    
-    for para in paras:
+    dataset = dict()
+    for c in cand:
+        right = []
+        wrong = []
+        for l in mylists:
+            if c in l:
+                right += l
+                for false_friend in l:
+                    for l2 in mylists:
+                        if false_friend in l2 and c not in l2:
+                            wrong += l2
 
-        if len(list(para.children)) > 0 and list(para.children)[0].name == "span" and list(para.children)[0]["class"][0] == 'blue1':
+        if len(right) > 1 and len(wrong) > 1:
+            dataset[c] = {"right": list(set(right)), "wrong": list(set(wrong))}
 
-            if main_word != "ztz":
-                syns = [re.sub("[^A-Za-zäöüÖÜÄß]","",x) for x in syns.split(", ") if " " not in list(x)]
-
-                if len(syns) == 0 or len(main_word) == 1 or "," in list(main_word) or list(main_word)[0] in ["1","2","3"]:
-                    pass
-                else:
-                    if len(syns[0]) != 0:
-
-                        output.append([main_word, syns])
-                        syn_dict[main_word] = syns
-
-            main_word = para.text
-            syns = ""
-        if 'class' in para.attrs.keys() and para["class"][0] == "noindent" and "b" not in [x.name for x in para.children] and "small" not in [x.name for x in para.children] and "sup" not in [x.name for x in para.children]:
-            syns += para.text
+    return dataset
 
 
+def filter_dataset(dataset, ratings):
+    basis = []
+    for k in dataset.keys():
+        right = dataset[k]["right"]
+        wrong = dataset[k]["wrong"]
 
-out = pd.DataFrame(output)
-out.columns = ["word","syn"]
-#out.to_csv("duden_synonyme.tsv", sep="\t")
-#with open("duden_synonyme.json","w") as f:
-#    json.dump(syn_dict,f)
+        right_ = [x for x in right if x not in wrong and " " not in x and x != k]
+        wrong_ = [x for x in wrong if x not in right and " " not in x and x != k]
 
-data = syn_dict
-
-mylists = []
-for k in list(data.keys()):
-    
-    mylists.append(data[k]+[k])
-    
-for l in mylists:
-    for word in l:
-        candidates = [x for x in mylists if l in x]
-        
-        if len(candidates) > 0:
-            print(l)
-            print(candidates)
-            print("----")
-
-frame = pd.DataFrame.from_dict(Counter([x for y in mylists for x in y]), orient="index")
-cand = list(frame[frame[0]>2].index)
-
-dataset = dict()
-for c in cand:
-    right = []
-    wrong = []
-    for l in mylists:
-      
-        if c in l:
-            right+=l
-            for false_friend in l:
-                
-                for l2 in mylists:
-      
-                    if false_friend in l2 and c not in l2:
-                        wrong+=l2
-    if len(right) > 1 and len(wrong) > 1:          
-        dataset[c] = {"right":list(set(right)),"wrong":list(set(wrong))}
-        
-#with open("duden_dataset.json","w") as f:
-#    json.dump(dataset,f)
-    
-data = dataset
-schulte = pd.read_csv("affective_norms.txt", sep="\t", index_col=0)
-
-basis = []
-for k in data.keys():
-    
-    right = data[k]["right"]
-    wrong = data[k]["wrong"]
-    
-    right_ = [x for x in right if x not in wrong and " " not in x and x != k]
-    wrong_ = [x for x in wrong if x not in right and " " not in x and x != k]
-    
-    if len(wrong_) < 4 or len(right_) < 2:
-        continue
-    try:
-        k_vec = np.array(schulte.loc[k,:])
-    except:
-        continue
-
-    i = 0
-    c = 0
-    r_choice = ""
-    
-    for r in right_:
-        try:
-            cos = 1-cosine(k_vec,np.array(schulte.loc[r,:]))
-
-            if cos > c:
-                c = cos
-                r_choice = r
-        except:
+        if len(wrong_) < 4 or len(right_) < 2:
             continue
-            
-    selection = []
-
-    for w in wrong_:
-        try:
-            cos = 1-cosine(k_vec,np.array(schulte.loc[w,:]))
-            selection.append([w,cos])
-        except:
-          
+        if k not in ratings.index:
             continue
-    
 
-    if len(selection) < 4:
-        continue
-    
-        
-    sel_frame = pd.DataFrame(selection)
-    sel_frame.columns = ["word","cos"]
-    sel_frame = sel_frame.sort_values("cos",ascending=False)
-    false_words = list(sel_frame["word"])[:4]
-        
-    score = (1-cosine(k_vec,np.array(schulte.loc[r_choice,:])))-np.mean(sel_frame.iloc[:4,1])
-    
-        
-    basis.append([k]+[r_choice]+false_words+[score])
-    
-   # if k == "Verzeichnis":
-   #     break
-frame = pd.DataFrame(basis)
-frame.columns = ["base","target","cand1","cand2","cand3","cand4","schulte_cosine"]
-frame.to_csv("duden_dataset.tsv", sep="\t")
+        k_vec = ratings.loc[k, :].values
+        r_choice, r_cos = max([(r, 1 - cosine(k_vec, ratings.loc[r, :].values) if r in ratings.index else -np.inf) for r in right_], key=lambda x: x[1])
 
+        w_frame = pd.DataFrame(wrong_, columns=['word'])
+        w_frame['cos'] = w_frame['word'].apply(
+            lambda w: 1 - cosine(k_vec, ratings.loc[w, :].values) if w in ratings.index else None)
+
+        w_frame = w_frame[~w_frame['cos'].isna()]
+        if len(w_frame) < 4:
+            continue
+
+        w_frame = w_frame.sort_values("cos", ascending=False)
+        false_words = list(w_frame["word"])[:4]
+        score = r_cos - w_frame['cos'].iloc[:4].mean()
+        basis.append([k] + [r_choice] + false_words + [score])
+
+    # if k == "Verzeichnis":
+    #     break
+    frame = pd.DataFrame(basis)
+    frame.columns = ["base", "target", "cand1", "cand2", "cand3", "cand4", "schulte_cosine"]
+    return frame
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--duden', dest='source_dir', type=str, default='duden_sources')
+    parser.add_argument('--output', type=argparse.FileType('w'), default='duden_prompts.tsv')
+    parser.add_argument('--ratings', type=argparse.FileType('r'), default='affective_norms.txt')
+
+    args = parser.parse_args()
+
+    print('parsing epub files', file=sys.stderr)
+    syn_dict = read_syn_dict(args.source_dir)
+    print('generating dataset', file=sys.stderr)
+    right_wrong_dataset = generate_dataset(syn_dict)
+    filtered_frame = filter_dataset(right_wrong_dataset, pd.read_csv(args.ratings, sep='\t', index_col=0))
+
+    filtered_frame.to_csv(args.output, sep="\t", index=None)
+    args.output.close()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,3 +1,4 @@
+import pandas
 import re
 
 import argparse
@@ -162,6 +163,15 @@ def generate_men_testset(men_data_file, restrict_vocab=None):
     return output
 
 
+def generate_duden_testset(duden_data_file, restrict_vocab):
+    df = pandas.read_csv(duden_data_file, sep='\t', index_col=False, header=0)
+    df = df[['base', 'target', 'cand1', 'cand2', 'cand3', 'cand4']]
+    if restrict_vocab is not None:
+        df = df[df.apply(lambda row: all(w in restrict_vocab for w in row), axis=1)]
+
+    return df.values
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--germanet', dest='gn_data_file', type=argparse.FileType('r'), default='germanet_relations.tsv')
@@ -169,6 +179,7 @@ def main():
     parser.add_argument('--schm', dest='schm_data_file', type=argparse.FileType('r'), default='analogies/de_re-rated_Schm280.txt')
     parser.add_argument('--simlex', dest='simlex_data_file', type=argparse.FileType('r'), default='SimLex_ALL_Langs_TXT_Format/MSimLex999_German.txt')
     parser.add_argument('--men', dest='men_data_file', type=argparse.FileType('r'), default='MEN_de/MEN_dataset_de_full.tsv')
+    parser.add_argument('--duden', dest='duden_data_file', type=argparse.FileType('r'), default='duden_prompts.tsv')
     parser.add_argument('--vocab',  type=argparse.FileType('r'))
     parser.add_argument('--output', type=argparse.FileType('w'), default='testsets.tsv')
 
@@ -194,7 +205,10 @@ def main():
     for line in generate_men_testset(args.men_data_file, restrict_vocab=restrict_vocab):
         print('men', *line, '', '', '', '', sep='\t', file=args.output)
 
-    # TODO Duden, Wiktionary
+    for line in generate_duden_testset(args.duden_data_file, restrict_vocab=restrict_vocab):
+        print('duden', '', *line, sep='\t', file=args.output)
+
+    # TODO Wiktionary
     args.output.close()
 
 
