@@ -24,7 +24,7 @@ for fname in files:
     
     for para in paras:
 
-        if list(para.children)[0].name == "span" and list(para.children)[0]["class"][0] == 'blue1':
+        if len(list(para.children)) > 0 and list(para.children)[0].name == "span" and list(para.children)[0]["class"][0] == 'blue1':
 
             if main_word != "ztz":
                 syns = [re.sub("[^A-Za-zäöüÖÜÄß]","",x) for x in syns.split(", ") if " " not in list(x)]
@@ -39,7 +39,7 @@ for fname in files:
 
             main_word = para.text
             syns = ""
-        if para["class"][0] == "noindent" and "b" not in [x.name for x in para.children] and "small" not in [x.name for x in para.children] and "sup" not in [x.name for x in para.children]:
+        if 'class' in para.attrs.keys() and para["class"][0] == "noindent" and "b" not in [x.name for x in para.children] and "small" not in [x.name for x in para.children] and "sup" not in [x.name for x in para.children]:
             syns += para.text
 
 
@@ -142,7 +142,7 @@ for k in data.keys():
     sel_frame = sel_frame.sort_values("cos",ascending=False)
     false_words = list(sel_frame["word"])[:4]
         
-    score = (1-cosine(k_vec,np.array(schulte.loc[r_choice,:])))-np.mean(sel_frame.iloc[:3,1])
+    score = (1-cosine(k_vec,np.array(schulte.loc[r_choice,:])))-np.mean(sel_frame.iloc[:4,1])
     
         
     basis.append([k]+[r_choice]+false_words+[score])
