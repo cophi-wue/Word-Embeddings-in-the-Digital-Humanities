@@ -1,0 +1,125 @@
+import argparse
+import itertools
+import sys
+
+import gensim.models.keyedvectors
+import numpy as np
+import pandas
+import torch
+from scipy.spatial.distance import cosine
+from scipy.stats import spearmanr
+from sklearn.metrics import f1_score
+
+
+def eval_men(embedding, men_pairs):
+    left, right, scores = zip(*men_pairs)
+    scores = -np.array(scores).astype(float)
+    left_vectors = embedding[left]
+    right_vectors = embedding[right]
+
+    return spearmanr(scores, [cosine(*pair) for pair in zip(left_vectors, right_vectors)])[0]
+
+
+def eval_toefl(embedding, toefl_prompts):
+    toefl_prompts = np.array(toefl_prompts)
+    vectors = embedding[toefl_prompts.reshape(-1)].reshape(*toefl_prompts.shape, -1)
+
+    return np.array(
+        [np.array([cosine(prompt[0], prompt[i]) for i in range(1, 5)]).argmin() == 0 for prompt in vectors]).mean()
+
+
+def eval_nearest_center_classification(embedding, pairs):
+    labels = []
+    directions = []
+    sorted_pairs = np.array(sorted(list(pairs), key=lambda x: x[-1]))
+    y_true = []
+    i = 0
+    for k, g in itertools.groupby(sorted_pairs, key=lambda x: x[-1]):
+        left, right, _ = zip(*g)
+
+        left_vectors = embedding[left]
+        right_vectors = embedding[right]
+        directions.append(right_vectors - left_vectors)
+        y_true.append(np.array(len(left_vectors) * [i]))
+        labels.append(k)
+        i += 1
+
+    directions = torch.tensor(np.concatenate(directions)).cuda()
+    y_true = torch.tensor(np.concatenate(y_true))
+
+    representants = torch.stack([directions[y_true == i].quantile(axis=0, q=0.5) for i in range(y_true[-1] + 1)])
+    y_pred = torch.cdist(representants, directions, p=1).argmin(dim=0).cpu()
+    macro_f1 = f1_score(y_true, y_pred, average='macro')
+    return macro_f1
+
+
+def evaluate(embedding, efname, testsets, out):
+    oov_words = {x for x in testsets[['0', '1', '2', '3', '4', '5']].values.reshape(-1) if x not in embedding} - {
+        np.nan}
+
+    missing = testsets.loc[:, ['0', '1', '2', '3', '4', '5']].apply(
+        lambda r: not all(pandas.isna(w) or w not in oov_words for w in r.values), axis=1)
+
+    testsets = testsets[~missing]
+    if len(oov_words) > 0:
+        print(f"WARN: {len(oov_words)} OOV words for {efname}, removing {missing.sum()} evaluation entries",
+              file=sys.stderr)
+        print(f"({', '.join(oov_words)})", file=sys.stderr)
+
+    # MEN
+    men_pairs = list(map(tuple, testsets[testsets['dataset'] == 'men'][['0', '1', 'value']].values))
+    print(efname, 'men', eval_men(embedding, men_pairs), sep='\t', file=out, flush=True)
+    # Simlex
+    simlex_pairs = list(map(tuple, testsets[testsets['dataset'] == 'simlex'][['0', '1', 'value']].values))
+    print(efname, 'simlex', eval_men(embedding, simlex_pairs), sep='\t', file=out, flush=True)
+    # Schm
+    schm_pairs = list(map(tuple, testsets[testsets['dataset'] == 'schm280'][['0', '1', 'value']].values))
+    print(efname, 'schm280', eval_men(embedding, schm_pairs), sep='\t', file=out, flush=True)
+    # toefl
+    toefl_prompts = list(map(tuple, testsets[testsets['dataset'] == 'toefl'][['0', '1', '2', '3', '4']].values))
+    print(efname, 'toefl', eval_toefl(embedding, toefl_prompts), sep='\t', file=out, flush=True)
+    # duden
+    duden_prompts = list(map(tuple, testsets[testsets['dataset'] == 'duden'][['0', '1', '2', '3', '4']].values))
+    print(efname, 'duden', eval_toefl(embedding, duden_prompts), sep='\t', file=out, flush=True)
+    # wiktionary
+    wiktionary_relations = list(map(tuple, testsets[testsets['dataset'] == 'wiktionary'][['0', '1', 'value']].values))
+    print(efname, 'wiktionary', eval_nearest_center_classification(embedding, wiktionary_relations), sep='\t', file=out,
+          flush=True)
+    # germanet
+    germanet_relations = list(map(tuple, testsets[testsets['dataset'] == 'germanet'][['0', '1', 'value']].values))
+    print(efname, 'germanet', eval_nearest_center_classification(embedding, germanet_relations), sep='\t', file=out,
+          flush=True)
+
+
+def load_embedding(efname):
+    try:
+        return gensim.models.keyedvectors.KeyedVectors.load_word2vec_format(efname, binary=True)
+    except:
+        print(f"WARN: {efname} does not appear to be in w2v binary format; optimistically trying fasttext format.",
+              file=sys.stderr)
+    try:
+        return gensim.models.fasttext.load_facebook_vectors(efname)
+    except:
+        print(f"WARN: {efname} does not appear to be in fasttext format; optimistically trying GloVe plain text format",
+              file=sys.stderr)
+
+    return gensim.models.keyedvectors.KeyedVectors.load_word2vec_format(efname, binary=False, no_header=True)
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output', type=argparse.FileType('w'), help='Output file, defaults to stdout',
+                        default=sys.stdout)
+    parser.add_argument('--testsets', required=True, type=argparse.FileType('r'),
+                        help='Testset file, as generated by generate_testsets.py', default=sys.stdout)
+    parser.add_argument('embedding', nargs='+', type=str, help="Embedding file, in word2vec binary format")
+    args = parser.parse_args()
+
+    testsets = pandas.read_csv(args.testsets, sep='\t')
+    args.testsets.close()
+
+    for efname in args.embedding:
+        embedding = load_embedding(efname)
+
+        evaluate(embedding, efname, testsets, args.output)
