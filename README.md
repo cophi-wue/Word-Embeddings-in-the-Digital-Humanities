@@ -68,3 +68,5 @@ Place both in the root folder. To generate the dataset, extract its content to d
 
 
 ## SimLex-999
+
+See the paper [Separated by an Un-common Language: Towards Judgment Language Informed Vector Space Modeling](https://arxiv.org/pdf/1508.00106.pdf) for more information and the corresponding [website](https://leviants.com/multilingual-simlex999-and-wordsim353/) to download the dataset.
