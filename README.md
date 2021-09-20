@@ -41,7 +41,11 @@ unzip duden_synonym_woerterbuch.epub -d duden_sources
 # 6. Generate Duden synonymy prompts
 python duden_extraction.py --duden duden_sources --ratings affective_norms.txt
 
-# 7. TODO Wiktionary
+# 7. Download the 2021-07-01 German Wiktionary Database dump
+wget https://dumps.wikimedia.org/dewiktionary/20210701/dewiktionary-20210701-pages-articles.xml.bz2
+
+# 8. Generate Wiktionary relation pairs
+python wiktionary_extraction.py
 
 # 8. Merge all datasets and filter with our evaluation vocabulary
 python generate_testsets.py --vocab ./evaluation_vocabulary
