@@ -1,12 +1,12 @@
-from collections import Counter
-
 import argparse
 import itertools
-import numpy as np
 import os
-import pandas as pd
 import re
 import sys
+from collections import Counter
+
+import numpy as np
+import pandas as pd
 from bs4 import BeautifulSoup
 from scipy.spatial.distance import cosine
 

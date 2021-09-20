@@ -1,12 +1,8 @@
-import pandas
-import re
-
 import argparse
-
 import collections
 import itertools
-import sys
 
+import pandas
 import regex
 
 
@@ -102,8 +98,8 @@ def generate_schm_testset(schm_data_file, restrict_vocab=None):
     output = []
 
     replacements = {'vorhergehend': 'vorhergehend', 'heilig': 'heilig', 'ficken': 'ficken', 'trinken': 'trinken',
-        'japanisch': 'japanisch', 'schlau': 'schlau', 'flüssig': 'flüssig', 'amerikanisch': 'amerikanisch',
-        'dumm': 'dumm', 'fbi': 'FBI', 'spring': 'Sprung', 'opec': 'OPEC'}
+                    'japanisch': 'japanisch', 'schlau': 'schlau', 'flüssig': 'flüssig', 'amerikanisch': 'amerikanisch',
+                    'dumm': 'dumm', 'fbi': 'FBI', 'spring': 'Sprung', 'opec': 'OPEC'}
 
     pat = regex.compile(r'(\p{L}+)-(\p{L}+)\t([\p{N}.]+)')
     for line in schm_data_file:
@@ -187,14 +183,20 @@ def generate_wiktionary_dataset(wiktionary_dataset, restrict_vocab, min_relation
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--germanet', dest='gn_data_file', type=argparse.FileType('r'), default='germanet_relations.tsv')
-    parser.add_argument('--toefl', dest='toefl_data_file', type=argparse.FileType('r'), default='analogies/de_toefl_subset.txt')
-    parser.add_argument('--schm', dest='schm_data_file', type=argparse.FileType('r'), default='analogies/de_re-rated_Schm280.txt')
-    parser.add_argument('--simlex', dest='simlex_data_file', type=argparse.FileType('r'), default='SimLex_ALL_Langs_TXT_Format/MSimLex999_German.txt')
-    parser.add_argument('--men', dest='men_data_file', type=argparse.FileType('r'), default='MEN_de/MEN_dataset_de_full.tsv')
+    parser.add_argument('--germanet', dest='gn_data_file', type=argparse.FileType('r'),
+                        default='germanet_relations.tsv')
+    parser.add_argument('--toefl', dest='toefl_data_file', type=argparse.FileType('r'),
+                        default='analogies/de_toefl_subset.txt')
+    parser.add_argument('--schm', dest='schm_data_file', type=argparse.FileType('r'),
+                        default='analogies/de_re-rated_Schm280.txt')
+    parser.add_argument('--simlex', dest='simlex_data_file', type=argparse.FileType('r'),
+                        default='SimLex_ALL_Langs_TXT_Format/MSimLex999_German.txt')
+    parser.add_argument('--men', dest='men_data_file', type=argparse.FileType('r'),
+                        default='MEN_de/MEN_dataset_de_full.tsv')
     parser.add_argument('--duden', dest='duden_data_file', type=argparse.FileType('r'), default='duden_prompts.tsv')
-    parser.add_argument('--wiktionary', dest='wiktionary_data_file', type=argparse.FileType('r'), default='wiktionary_relations.tsv')
-    parser.add_argument('--vocab',  type=argparse.FileType('r'))
+    parser.add_argument('--wiktionary', dest='wiktionary_data_file', type=argparse.FileType('r'),
+                        default='wiktionary_relations.tsv')
+    parser.add_argument('--vocab', type=argparse.FileType('r'))
     parser.add_argument('--min-relation-size', type=int, default=10)
     parser.add_argument('--output', type=argparse.FileType('w'), default='testsets.tsv')
 
@@ -205,7 +207,8 @@ def main():
         args.vocab.close()
 
     print('dataset', 'value', '0', '1', '2', '3', '4', '5', sep='\t', file=args.output)
-    for line in generate_germanet_testset(args.gn_data_file, restrict_vocab=restrict_vocab, min_relation_size=args.min_relation_size):
+    for line in generate_germanet_testset(args.gn_data_file, restrict_vocab=restrict_vocab,
+                                          min_relation_size=args.min_relation_size):
         print('germanet', *line, '', '', '', '', sep='\t', file=args.output)
 
     for line in generate_toefl_testset(args.toefl_data_file, restrict_vocab=restrict_vocab):
@@ -223,7 +226,8 @@ def main():
     for line in generate_duden_testset(args.duden_data_file, restrict_vocab=restrict_vocab):
         print('duden', '', *line, sep='\t', file=args.output)
 
-    for line in generate_wiktionary_dataset(args.wiktionary_data_file, restrict_vocab=restrict_vocab, min_relation_size=args.min_relation_size):
+    for line in generate_wiktionary_dataset(args.wiktionary_data_file, restrict_vocab=restrict_vocab,
+                                            min_relation_size=args.min_relation_size):
         print('wiktionary', *line, '', '', '', '', sep='\t', file=args.output)
 
     args.output.close()

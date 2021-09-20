@@ -1,11 +1,11 @@
 import argparse
 import os
+import re
 import unicodedata
 
 import Levenshtein
 import pandas
 import pandas as pd
-import re
 import regex
 from bz2file import BZ2File
 from tqdm import tqdm
@@ -26,9 +26,10 @@ def main():
     verben = []
     derivs = []
     adj_targets = ["bar", "en", "erig", "ern", "fach", "frei", "haft", "ig", "isch",
-               "lich", "los", "mäßig", "sam", "sch"]
-    subst_targets = ["chen", "e", "ei", "el", "en", "er", "heit", "ien", "iker", "in", "keit", "lein", "ler", "ling", "mut",
-               "nis", "rich", "sal", "schaft", "sel", "tum", "ung"]
+                   "lich", "los", "mäßig", "sam", "sch"]
+    subst_targets = ["chen", "e", "ei", "el", "en", "er", "heit", "ien", "iker", "in", "keit", "lein", "ler", "ling",
+                     "mut",
+                     "nis", "rich", "sal", "schaft", "sel", "tum", "ung"]
 
     with tqdm(unit='B', unit_scale=True, smoothing=0.05, total=os.path.getsize(args.wiktionary)) as pbar:
         for record in Parser(bz):
@@ -42,14 +43,15 @@ def main():
             if re.search(r'\|Adjektiv\|', record['wikitext']):
                 try:
                     target, lemma, base = process_deriv(record, adj_targets)
-                    derivs.append(['adj_'+target, lemma, base])
-                except: pass
+                    derivs.append(['adj_' + target, lemma, base])
+                except:
+                    pass
             if re.search(r'\|Substantiv\|', record['wikitext']):
                 try:
                     target, lemma, base = process_deriv(record, subst_targets)
-                    derivs.append(['subst_'+target, lemma, base])
-                except: pass
-
+                    derivs.append(['subst_' + target, lemma, base])
+                except:
+                    pass
 
             if 'flexion' in record.keys():
                 flexion = record["flexion"]
@@ -75,10 +77,10 @@ def process_deriv(record, targets):
         herkunft = re.search(r'{{(Herkunft|Ableitung)}}[^{]*(\[\[Ableitung]][^{]*){{', record['wikitext'], re.MULTILINE)
         if herkunft is None: continue
         herkunft = herkunft.group(2).replace('\n', ' ')
-        if not re.search(r"''\[\[-"+t+"]]", herkunft): continue
+        if not re.search(r"''\[\[-" + t + "]]", herkunft): continue
         base = [b[0] for b in regex.findall(r"''\[\[(\p{L}+)]](.,;)?''", herkunft)]
 
-        def check_prefix(a,b):
+        def check_prefix(a, b):
             return unicodedata.normalize('NFD', a[0]).lower() != unicodedata.normalize('NFD', b[0]).lower()
 
         if len(base) == 0: continue
@@ -94,10 +96,6 @@ def process_deriv(record, targets):
 
             if dist <= 3:
                 return t, lemma, candidate
-
-
-
-
 
 
 def print_subst_infl(substantive, out):
@@ -149,8 +147,7 @@ def print_deriv(derivs, out):
     df = pandas.DataFrame(derivs, columns=['derivation', 'base', 'lemma'])
     df.drop_duplicates(subset=['derivation', 'base'], keep=False, inplace=True)
     for row in df.sort_values('derivation').itertuples():
-        print('derivations_'+row.derivation, row.lemma, row.base, sep='\t', file=out)
-
+        print('derivations_' + row.derivation, row.lemma, row.base, sep='\t', file=out)
 
 
 if __name__ == "__main__":

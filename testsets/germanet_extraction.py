@@ -1,7 +1,5 @@
 import argparse
 
-import sys
-
 from germanetpy.filterconfig import Filterconfig
 from germanetpy.germanet import Germanet
 from germanetpy.synset import WordCategory
