@@ -10,7 +10,7 @@ import sys
 import regex
 
 
-def generate_germanet_testset(gn_data_file, restrict_vocab=None):
+def generate_germanet_testset(gn_data_file, restrict_vocab=None, min_relation_size=10):
     tuples = [x.strip().split('\t') for x in gn_data_file]
 
     synsets_of_word = collections.defaultdict(set)
@@ -78,7 +78,10 @@ def generate_germanet_testset(gn_data_file, restrict_vocab=None):
         if t[2] in selected_relations:
             gn_output.append((t[2], t[0], t[3]))
 
-    return list(sorted(gn_output, key=lambda x: x[0]))
+    df = pandas.DataFrame(gn_output)
+    relation_size = df.groupby(0).size()
+    df = df[df.apply(lambda x: relation_size[x[0]] > min_relation_size, axis=1)]
+    return df.values
 
 
 def generate_toefl_testset(toefl_data_file, restrict_vocab=None):
@@ -172,11 +175,13 @@ def generate_duden_testset(duden_data_file, restrict_vocab):
     return df.values
 
 
-def generate_wiktionary_dataset(wiktionary_dataset, restrict_vocab):
+def generate_wiktionary_dataset(wiktionary_dataset, restrict_vocab, min_relation_size=0):
     df = pandas.read_csv(wiktionary_dataset, sep='\t', index_col=False, header=None)
     if restrict_vocab is not None:
         df = df[df.apply(lambda row: all(w in restrict_vocab for w in row[[1, 2]]), axis=1)]
 
+    relation_size = df.groupby(0).size()
+    df = df[df.apply(lambda x: relation_size[x[0]] > min_relation_size, axis=1)]
     return df.values
 
 
@@ -190,6 +195,7 @@ def main():
     parser.add_argument('--duden', dest='duden_data_file', type=argparse.FileType('r'), default='duden_prompts.tsv')
     parser.add_argument('--wiktionary', dest='wiktionary_data_file', type=argparse.FileType('r'), default='wiktionary_relations.tsv')
     parser.add_argument('--vocab',  type=argparse.FileType('r'))
+    parser.add_argument('--min-relation-size', type=int, default=10)
     parser.add_argument('--output', type=argparse.FileType('w'), default='testsets.tsv')
 
     args = parser.parse_args()
@@ -199,11 +205,11 @@ def main():
         args.vocab.close()
 
     print('dataset', 'value', '0', '1', '2', '3', '4', '5', sep='\t', file=args.output)
-    for line in generate_germanet_testset(args.gn_data_file, restrict_vocab=restrict_vocab):
+    for line in generate_germanet_testset(args.gn_data_file, restrict_vocab=restrict_vocab, min_relation_size=args.min_relation_size):
         print('germanet', *line, '', '', '', '', sep='\t', file=args.output)
 
     for line in generate_toefl_testset(args.toefl_data_file, restrict_vocab=restrict_vocab):
-        print('toefl', *line, '', sep='\t', file=args.output)
+        print('toefl', '', *line, '', sep='\t', file=args.output)
 
     for line in generate_schm_testset(args.schm_data_file, restrict_vocab=restrict_vocab):
         print('schm280', *line, '', '', '', '', sep='\t', file=args.output)
